@@ -8,7 +8,7 @@ find_package(MPI REQUIRED)
 include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 
 OPTION(RUN_TESTS "Compile and run tests" ON)
-OPTION(USE_TCMALLOC "Replace builtin malloc with TCMalloc" ON)
+OPTION(USE_TCMALLOC "Replace builtin malloc with TCMalloc" OFF)
 OPTION(USE_PROFILER "Use TCMalloc profiler (requires TCMalloc)" OFF)
 OPTION(USE_GUROBI "Use Gurobi for ILP Solving in multiterminal cut" OFF)
 
