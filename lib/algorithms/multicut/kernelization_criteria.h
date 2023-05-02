@@ -18,6 +18,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <optional>
 
 #include "algorithms/global_mincut/noi_minimum_cut.h"
 #include "algorithms/misc/equal_neighborhood.h"
