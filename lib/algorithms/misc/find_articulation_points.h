@@ -17,6 +17,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <optional>
 
 #include "algorithms/multicut/multicut_problem.h"
 #include "data_structure/mutable_graph.h"
