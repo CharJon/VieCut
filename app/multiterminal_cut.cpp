@@ -77,6 +77,9 @@ int main(int argn, char** argv) {
                   "Print best solution");
     cmdl.add_flag('X', "inexact", config->inexact, "Apply inexact heuristics");
 
+    cmdl.add_string('y', "reducedpath", config->reduced_path,
+                    "Path to store reduced graphs to");
+
     if (!cmdl.process(argn, argv))
         return -1;
 

@@ -35,6 +35,10 @@ class configuration {
     size_t seed = 0;
     bool verbose = false;
 
+    // reduced graph path
+    std::string reduced_path = "";
+    int num_reduced_graphs = 0;
+
     // multiterminal cut parameters
     std::string edge_selection = "heavy_vertex";
     std::string queue_type = "bound_sum";

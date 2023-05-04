@@ -25,6 +25,42 @@
 #include "common/configuration.h"
 #include "tools/timer.h"
 
+class reducedGraph {
+public:
+    int n;
+    int m;
+    std::vector<int> nodes;
+
+    std::vector<std::tuple<NodeID, NodeID, double, int>> edges;
+
+    reducedGraph(int num_nodes, int num_edges) : n(num_nodes), m(num_edges)
+    {
+        nodes = std::vector<int>(n, -1);
+    }
+
+    void addEdge(NodeID u, NodeID v, double weight, int edgeAssignment) {
+        edges.emplace_back(u, v, weight, edgeAssignment);
+    }
+
+    void addNode(NodeID u, int nodeAssignment) {
+        nodes[u] = nodeAssignment;
+    }
+
+    void writeGraph(std::string filename) {
+        std::ofstream out(filename);
+        out << n << " " << m << std::endl;
+
+        for (int i = 0; i < n; ++i) {
+            out << i << " " << nodes[i] << std::endl;
+        }
+
+        for (auto& [u, v, weight, edgeAssignment] : edges) {
+            out << u << " " << v << " " << weight << " " << edgeAssignment << std::endl;
+        }
+        out.close();
+    }
+};
+
 class ilp_model {
  public:
     std::tuple<std::vector<NodeID>, EdgeWeight, bool> computeIlp(
@@ -33,12 +69,18 @@ class ilp_model {
         size_t num_terminals,
         bool parallel,
         size_t thread_id) {
+        //multicut_problem::writeGraph(problem, "ilp_graph");
+
+
         try {
+
             mutableGraphPtr graph = problem->graph;
             timer ilp_timer;
             LOG1 << "starting ilp on graph with " << graph->n() << " vertices "
                  << "and " << graph->m() << " edges!";
             GRBModel model = GRBModel(ilp_model::env);
+
+            reducedGraph ilp_graph(graph->n(), graph->m() / 2);
 
             NodeID max_weight = 0;
             NodeID max_id = 0;
@@ -81,18 +123,31 @@ class ilp_model {
             model.set(GRB_DoubleParam_TimeLimit,
                       configuration::getConfig()->ilpTime);
             // Set decision variables for nodes
-            for (size_t q = 0; q < num_terminals; q++) {
+            for (size_t q = 0; q < num_terminals; q++) { // loop over terminals
                 GRBLinExpr nodeTot = 0;
-                for (NodeID i = 0; i < graph->n(); i++) {
-                    if (presets[i] < num_terminals) {
-                        bool isCurrent = (presets[i] == q);
+                for (NodeID i = 0; i < graph->n(); i++) { // loop over nodes
+                    if (presets[i] < num_terminals) { // if node is assigned to any terminal
+                        bool isCurrent = (presets[i] == q); // if node is already assigned to this terminal
                         double f = isCurrent ? 1.0 : 0.0;
-                        nodes[q][i] = model.addVar(f, f, 0, GRB_BINARY);
+                        nodes[q][i] = model.addVar(f, f, 0, GRB_BINARY); // then fix this value to 1, else 0
                         nodes[q][i].set(GRB_DoubleAttr_Start, f);
                     } else {
                         nodes[q][i] = model.addVar(0.0, 1.0, 0, GRB_BINARY);
                         nodes[q][i].set(GRB_DoubleAttr_Start, (max_id == q));
                     }
+                }
+            }
+
+            for (NodeID i = 0; i < graph->n(); i++) { // loop over nodes
+                if (i < num_terminals) {
+                    ilp_graph.addNode(i, -2); // is terminal itself
+                }
+                else if (presets[i] < num_terminals) {
+                    ilp_graph.addNode(i, presets[i]); // assigned to a terminal
+                }
+                else
+                {
+                    ilp_graph.addNode(i, -1); // not assigned to any terminal
                 }
             }
 
@@ -114,6 +169,9 @@ class ilp_model {
                              && presets[t] != max_id) ? 1.0 : 0.0;
 
                         edges[j].set(GRB_DoubleAttr_Start, start);
+
+                        ilp_graph.addEdge(n, t, w, start);
+
                         for (size_t q = 0; q < num_terminals; q++) {
                             GRBLinExpr c = nodes[q][n] - nodes[q][t];
                             // Add constraint: valid partiton
@@ -133,6 +191,16 @@ class ilp_model {
                     }
                 }
             }
+
+
+            auto config = configuration::getConfig();
+
+            if (config->reduced_path != "")
+            {
+                ilp_graph.writeGraph(config->reduced_path + "_" + std::to_string(config->num_reduced_graphs) + ".mtc");
+                config->num_reduced_graphs++;
+            }
+
 
             // Add constraint: sum of all decision variables for 1 node is 1
             for (size_t i = 0; i < graph->n(); i++) {
